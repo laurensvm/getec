@@ -2,6 +2,8 @@ import argparse, logging
 
 from getec import IOHandler, PreProcessor
 
+import numpy as np
+import matplotlib.pyplot as plt
 
 def parse_args():
     """
@@ -89,14 +91,25 @@ class App(object):
     def main(self):
 
         # TEMP
-        rate, data = self.io_handler.read_wav_file("Bellaire - Brasil.mp3")
+        rate, data = self.io_handler.read_wav_file("Dave Brubeck - Take Five.mp3")
 
         if self.downsample:
             data = PreProcessor.downsample(data, rate)
 
-        samples = self.preprocessor.get
+
+        samples = PreProcessor.get_audio_fragment(data)
+
+        # First get the spectrogram representation. Then use max pooling to reduce the dimensionality
+        freq, time, spectrogram = PreProcessor.get_spectrogram_data(samples)
+        freq, spectrogram = PreProcessor.max_pool_spectrogram(spectrogram)
+
+        spectrogram = PreProcessor.normalize_spectrogram(spectrogram)
+
+        PreProcessor.plot_spectrogram(spectrogram, time, freq)
+
 
 if __name__ == "__main__":
     args = parse_args()
     app = App(args)
+    app.main()
 

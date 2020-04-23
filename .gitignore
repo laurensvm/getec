@@ -4,3 +4,4 @@ env/
 *.pyc
 *.gitattributes
 __pycache__/
+songs/

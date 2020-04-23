@@ -1,8 +1,9 @@
 import logging
 import numpy as np
-import matplotlib.pyplot as plt
 
 from scipy import signal
+from skimage.measure import block_reduce
+import matplotlib.pyplot as plt
 
 from .exceptions import DownSampleException, NotEnoughSamplesException
 
@@ -26,7 +27,7 @@ class PreProcessor(object):
         return signal.resample(data, n_downsampled).astype(np.int16)
 
     @staticmethod
-    def get_audio_fragment(self, data, rate=RATE, n=120):
+    def get_audio_fragment(data, rate=RATE, n=120):
         """
         This method extracts n seconds of audio in the middle of the audio
         :param data:
@@ -36,19 +37,19 @@ class PreProcessor(object):
         """
 
         middle_idx = int(len(data) / 2)
-        sample_range = n / 2 * rate
+        sample_range = int(n / 2 * rate)
 
         if middle_idx - sample_range < 0:
             raise NotEnoughSamplesException()
 
         sample_fragment = data[middle_idx - sample_range: middle_idx + sample_range]
 
-        logging.DEBUG("Extracted audio fragment from data which will be further processed.")
+        logging.debug("Extracted audio fragment from data which will be further processed.")
 
         return sample_fragment
 
     @staticmethod
-    def get_spectrogram_data(self, data, rate, nwindow=None):
+    def get_spectrogram_data(data, rate=RATE, nwindow=None):
         """
         Gets the spectrogram representation of the data
         :param data:
@@ -67,9 +68,43 @@ class PreProcessor(object):
             noverlap=nwindow / 2,
             scaling='spectrum')
 
-        logging.DEBUG("Calculated spectrogram data.")
+        spec = spec.astype(np.int16)
+
+        logging.debug("Calculated spectrogram data.")
         return freqs, times, spec
 
     @staticmethod
-    def max_pool_frequencies(self, data, block_size=(1, 1)):
-        pass
+    def max_pool_spectrogram(spectrogram, block_size=(24, 1)):
+        """
+        This method reduces the frequency domain by max pooling
+        :param spectrogram:
+        :param block_size:
+        :return:
+        """
+        max_pooled_samples = block_reduce(spectrogram, block_size, np.max)
+        freq = np.linspace(0, PreProcessor.RATE / 2, max_pooled_samples.shape[0])
+        return freq, max_pooled_samples
+
+    @staticmethod
+    def plot_spectrogram(spectrogram, time=None, freq=None):
+        """
+        Plots the spectrogram
+        :param spectrogram:
+        :param time:
+        :param freq:
+        :return:
+        """
+        if type(time) == None:
+            time = np.linspace(0, 120, spectrogram.shape[1])
+
+        if type(freq) == None:
+            freq = np.linspace(0, PreProcessor.RATE, spectrogram.shape[0])
+
+        plt.pcolormesh(time, freq, 10 * np.log10(spectrogram))
+        plt.show()
+
+    @staticmethod
+    def normalize_spectrogram(s):
+        s_max, s_min = s.max(), s.min()
+        s = (s - s_min) / (s_max - s_min)
+        return s
