@@ -6,6 +6,7 @@ from skimage.measure import block_reduce
 import matplotlib.pyplot as plt
 
 from .exceptions import DownSampleException, NotEnoughSamplesException
+from .genre import Genre
 
 class PreProcessor(object):
     """
@@ -89,10 +90,10 @@ class PreProcessor(object):
     def plot_spectrogram(spectrogram, time=None, freq=None):
         """
         Plots the spectrogram
-        :param spectrogram:
-        :param time:
-        :param freq:
-        :return:
+        :param spectrogram: The spectrogram
+        :param time: A 1d vector consisting of the linear timesteps
+        :param freq: A 1d vector consisting of the linear frequency bins
+        :return: Show plot
         """
         if type(time) == None:
             time = np.linspace(0, 120, spectrogram.shape[1])
@@ -105,6 +106,26 @@ class PreProcessor(object):
 
     @staticmethod
     def normalize_spectrogram(s):
+        """
+        Normalizes the spectrogram into values ranging from [0, 1]
+        :param s: The spectrogram
+        :return: The normalized spectrogram
+        """
         s_max, s_min = s.max(), s.min()
         s = (s - s_min) / (s_max - s_min)
         return s
+
+    @staticmethod
+    def encode_genre_to_vector(genre):
+        """
+        This method takes a genre and returns a vector with zeros except
+        for the index of the corresponding genre.
+        :param genre:
+        :return:
+        """
+
+        if type(genre) == list:
+            return np.fromiter(map(lambda x: x[0], genre), dtype=np.int8)
+        else:
+            return genre.value
+

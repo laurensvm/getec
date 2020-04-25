@@ -7,11 +7,18 @@ import logging
 """
 Preprocessor Exceptions
 """
-class DownSampleException():
+class DownSampleException(Exception):
     def __init__(self):
-        logging.ERROR("Cannot downsample signal as the required sample rate is too low")
+        logging.error("Cannot downsample signal as the required sample rate is too low")
 
-class NotEnoughSamplesException():
+class NotEnoughSamplesException(Exception):
     def __init__(self):
-        logging.ERROR("Failed extracting audio fragment. The audio data does not have enough samples")
+        logging.error("Failed extracting audio fragment. The audio data does not have enough samples")
 
+class FileExtensionException(Exception):
+    def __init__(self):
+        logging.error("File extension does not match given extensions while changing extensions")
+
+class PathDoesNotExistException(Exception):
+    def __init__(self):
+        logging.error("Path does not exist while reading wave file")

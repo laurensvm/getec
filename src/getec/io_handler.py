@@ -1,3 +1,5 @@
+import os
+
 from os import path
 from pathlib import Path
 from shutil import copyfile
@@ -5,6 +7,10 @@ from pydub import AudioSegment
 from scipy.io import wavfile
 
 import logging
+import h5py
+
+from .genre import Genre
+from .exceptions import PathDoesNotExistException, FileExtensionException
 
 
 class IOHandler(object):
@@ -31,7 +37,6 @@ class IOHandler(object):
             self.cashed_path = path.join(self.songs_path, "cashed")
             Path(path.join(self.cashed_path)).mkdir(parents=True, exist_ok=True)
 
-
     def get_source_path(self, song):
         """
         Returns the full path of the song given that the song
@@ -41,9 +46,7 @@ class IOHandler(object):
         """
         return path.join(self.songs_path, song)
 
-
-
-    def mp3_to_wav(self, song):
+    def mp3_to_wav(self, song_path):
         """
         Converts the song from .mp3 format into .wav format
         :param song:
@@ -52,32 +55,34 @@ class IOHandler(object):
 
         # Check if file is of type wave already
         # if so, return the filepath
-        if song.endswith(".wav", 4):
-            return song
+        if song_path.endswith(".wav", 4):
+            return song_path
 
-        source_path = path.join(self.songs_path, song)
-        if not path.exists(source_path):
-            raise IOError("Specified song does not exist in path: {0}".format(self.songs_path))
+        if not path.exists(song_path):
+            raise PathDoesNotExistException()
+
+        # Get the song name
+        song_name = path.split(song_path)[1]
 
         # Copy the file to the cashed folder and change extension
-        cashed_source_path = path.join(self.cashed_path, change_extension(song))
+        cashed_source_path = path.join(self.cashed_path, change_extension(song_name))
 
         # Check if the file already exists in the cashed source path
         # if so, return the cashed source path
         if path.exists(cashed_source_path):
-            logging.debug("Song {0} does already exist in cashed folder".format(song))
+            logging.debug("Song {0} does already exist in cashed folder".format(song_name))
             return cashed_source_path
         else:
-            copyfile(source_path, cashed_source_path)
+            copyfile(song_path, cashed_source_path)
 
         # Converts the song from .mp3 to .wav
-        logging.info("Converting song {0} from .mp3 to .wav".format(song))
+        logging.info("Converting song {0} from .mp3 to .wav".format(song_name))
         converter = AudioSegment.from_mp3(cashed_source_path)
         converter.export(cashed_source_path, format="wav")
 
         return cashed_source_path
 
-    def read_wav_file(self, song):
+    def read_wav_file(self, song_path):
         """
         Reads a wave file from the file system and returns a numpy array with the
         audio data, as well as the sample rate
@@ -85,22 +90,44 @@ class IOHandler(object):
         :return:
         """
 
-        logging.debug("Reading wave file {0}".format(song))
-
-        src = path.join(self.songs_path, song)
-
         # Check if the src path is valid
-        if not path.exists(src):
-            raise IOError("Path does not exist while reading wave file")
+        if not path.exists(song_path):
+            raise PathDoesNotExistException()
+
+        logging.debug("Reading wave file from path: {0}".format(song_path))
 
         # If the file is of type mp3, we automatically convert to wave
-        if song.endswith(".mp3"):
-            src = self.mp3_to_wav(song)
+        if song_path.endswith(".mp3"):
+            song_path = self.mp3_to_wav(song_path)
 
-        rate, audio_data = wavfile.read(src)
+        rate, audio_data = wavfile.read(song_path)
 
         return rate, audio_data.T[0]
 
+    def get_filepaths_for_genre(self, genre):
+        """
+        Get all the filepaths from songs in specified genre
+        The folder serves as the label for the audio data
+        :param genre:
+        :return: A list of song paths from the specified genre
+        """
+        genre_path = path.join(self.songs_path, genre.name.lower())
+        if path.exists(genre_path):
+            song_paths = [s for s in os.listdir(genre_path) if path.isfile(path.join(genre_path, s))]
+            return [path.join(genre_path, s) for s in song_paths if not s.startswith(".")]
+        return []
+
+    def clear_cash(self):
+        """
+        Clears all .wav files in the cash folder
+        :return:
+        """
+        for file in os.listdir(self.cashed_path):
+            if path.isfile(path.join(self.cashed_path, file)) and file.endswith(".wav"):
+                os.remove(path.join(self.cashed_path, file))
+
+    def check_cash(self):
+        return len([f for f in os.listdir(self.cashed_path) if path.isfile(path.join(self.cashed_path, f))])
 
 def change_extension(song, from_ext=".mp3", to_ext=".wav"):
     """
@@ -117,7 +144,7 @@ def change_extension(song, from_ext=".mp3", to_ext=".wav"):
         song = song[:-len(from_ext)]
         song += to_ext
     else:
-        raise IOError("File extension does not match given extensions while changing extensions")
+        raise FileExtensionException()
 
     return song
 

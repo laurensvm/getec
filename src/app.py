@@ -1,9 +1,10 @@
 import argparse, logging
 
-from getec import IOHandler, PreProcessor
+from getec import IOHandler, PreProcessor, Genre, build_recurrent_network, download_playlists
 
 import numpy as np
 import matplotlib.pyplot as plt
+import tensorflow as tf
 
 def parse_args():
     """
@@ -47,6 +48,14 @@ def parse_args():
              "\n Be aware that this yields higher preprocessing times"
     )
 
+    parser.add_argument(
+        "--download_songs", "-download",
+        action="store_const",
+        const=True,
+        help="Download all the songs specified in playlists before performing preprocessing and " +
+             "network training. On first run, this argument must be enabled to gather data"
+    )
+
     return parser.parse_args()
 
 
@@ -72,6 +81,10 @@ class App(object):
 
         self.io_handler = IOHandler(songs_path=args.songs_path)
 
+        if args.download_songs:
+            self.download_data()
+
+
     def configure_logging(self):
         """
         Configures the logging engine
@@ -88,14 +101,33 @@ class App(object):
 
         logging.info("Logger initialised")
 
-    def main(self):
+    def perform_batch_preprocessing(self, genres=None):
+        # If no list of genres is specified, perform preprocessing on all
+        if not genres:
+            genres = [g for g in Genre]
 
-        # TEMP
-        rate, data = self.io_handler.read_wav_file("Dave Brubeck - Take Five.mp3")
+        processed_songs = []
+
+        for genre in genres:
+            song_paths = self.io_handler.get_filepaths_for_genre(genre)
+
+            for song in song_paths:
+                rate, data = self.io_handler.read_wav_file(song)
+
+                data = self.preprocess_audio_data(rate, data, genre)
+
+                processed_songs.append(data)
+
+                # Clear cash if more than 10 wav files in cashed folder
+                if self.io_handler.check_cash() > 10:
+                    self.io_handler.clear_cash()
+
+        self.train_model(processed_songs)
+
+    def preprocess_audio_data(self, rate, data, genre):
 
         if self.downsample:
             data = PreProcessor.downsample(data, rate)
-
 
         samples = PreProcessor.get_audio_fragment(data)
 
@@ -105,11 +137,35 @@ class App(object):
 
         spectrogram = PreProcessor.normalize_spectrogram(spectrogram)
 
-        PreProcessor.plot_spectrogram(spectrogram, time, freq)
+        label_encoding = np.full((spectrogram.shape[0], 1), genre.value)
 
+        # First column of the matrix is the encoded genre
+        return np.append(label_encoding, spectrogram, axis=1)
+
+    def train_model(self, processed_data):
+        model = build_recurrent_network()
+
+
+        genre_encodings = list(map(lambda x: x[:,0], processed_data))
+        y_train = PreProcessor.encode_genre_to_vector(genre_encodings)
+        x_train = list(map(lambda x: x[:, 1:], processed_data))
+
+
+        input = np.array(x_train)
+        model.fit(input, np.array(y_train), epochs=5)
+
+        preds = model.predict(input)
+
+        print(preds)
+        print(np.argmax(preds), np.array(y_train))
+
+    def download_data(self):
+        logging.info("Downloading audio data from youtube playlists specified in downloader.py")
+        download_playlists(self.io_handler.songs_path)
 
 if __name__ == "__main__":
     args = parse_args()
     app = App(args)
-    app.main()
+    # app.download_data()
+    app.perform_batch_preprocessing()
 
