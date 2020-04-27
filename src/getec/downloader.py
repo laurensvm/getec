@@ -13,7 +13,7 @@ def download_playlists(songs_path, options=None):
         options = {
             'format': 'bestaudio/best',
             'ignoreerrors': True,
-    
+
             'download_archive': path.join(songs_path, "archive.txt"),
             'downloader': [{
                'continuedl': True
@@ -39,7 +39,7 @@ def download_playlists(songs_path, options=None):
 
     for genre, playlists in playlist_genres.items():
         #TEMP
-        if genre == "JAZZ":
+        if genre == "ROCK" or genre == "JAZZ":
             continue
 
         logging.info("Downloading playlists from genre {0}".format(genre))

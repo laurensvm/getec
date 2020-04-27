@@ -6,6 +6,7 @@ from shutil import copyfile
 from pydub import AudioSegment
 from scipy.io import wavfile
 
+import numpy as np
 import logging
 import h5py
 
@@ -116,6 +117,15 @@ class IOHandler(object):
             song_paths = [s for s in os.listdir(genre_path) if path.isfile(path.join(genre_path, s))]
             return [path.join(genre_path, s) for s in song_paths if not s.startswith(".")]
         return []
+
+    def build_filepath(self, filename, genre):
+        filepath = path.join(self.songs_path, genre.name.lower(), filename)
+        if path.exists(filepath):
+            return filepath
+        elif path.exists(filename):
+            return filename
+        else:
+            raise PathDoesNotExistException()
 
     def clear_cash(self):
         """

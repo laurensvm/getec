@@ -1,6 +1,6 @@
 import argparse, logging
 
-from getec import IOHandler, PreProcessor, Genre, build_recurrent_network, download_playlists
+from getec import *
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -114,7 +114,10 @@ class App(object):
             for song in song_paths:
                 rate, data = self.io_handler.read_wav_file(song)
 
-                data = self.preprocess_audio_data(rate, data, genre)
+                try:
+                    data = self.preprocess_audio_data(rate, data, genre)
+                except (NotEnoughSamplesException, DataTypeException):
+                    continue
 
                 processed_songs.append(data)
 
@@ -125,6 +128,8 @@ class App(object):
         self.train_model(processed_songs)
 
     def preprocess_audio_data(self, rate, data, genre):
+        if not isinstance(data, np.ndarray):
+            raise DataTypeException()
 
         if self.downsample:
             data = PreProcessor.downsample(data, rate)
@@ -145,11 +150,9 @@ class App(object):
     def train_model(self, processed_data):
         model = build_recurrent_network()
 
-
         genre_encodings = list(map(lambda x: x[:,0], processed_data))
         y_train = PreProcessor.encode_genre_to_vector(genre_encodings)
         x_train = list(map(lambda x: x[:, 1:], processed_data))
-
 
         input = np.array(x_train)
         model.fit(input, np.array(y_train), epochs=5)
@@ -163,9 +166,17 @@ class App(object):
         logging.info("Downloading audio data from youtube playlists specified in downloader.py")
         download_playlists(self.io_handler.songs_path)
 
+    def preprocess_file(self, filename, genre):
+        filepath = self.io_handler.build_filepath(filename, genre)
+        rate, data = self.io_handler.read_wav_file(filepath)
+
+        try:
+            return self.preprocess_audio_data(rate, data, genre)
+        except DataTypeException:
+            return
+
 if __name__ == "__main__":
     args = parse_args()
     app = App(args)
     # app.download_data()
     app.perform_batch_preprocessing()
-

@@ -22,3 +22,7 @@ class FileExtensionException(Exception):
 class PathDoesNotExistException(Exception):
     def __init__(self):
         logging.error("Path does not exist while reading wave file")
+
+class DataTypeException(Exception):
+    def __init__(self):
+        logging.error("The datatype of the audio date given to the preprocessor is not of type np.array")
