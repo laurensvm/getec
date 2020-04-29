@@ -7,11 +7,12 @@ from pydub import AudioSegment
 from scipy.io import wavfile
 
 import numpy as np
+import tensorflow as tf
 import logging
-import h5py
 
 from .genre import Genre
-from .exceptions import PathDoesNotExistException, FileExtensionException
+from .exceptions import PathDoesNotExistException, FileExtensionException, InvalidBitSizeException
+from .formatter import _parse_function
 
 
 class IOHandler(object):
@@ -21,8 +22,10 @@ class IOHandler(object):
     """
 
     SONGS_DIRECTORY = "songs"
+    CACHED_DIRECTORY = "cached"
+    PROCESSED_FILENAME = "processed.tfrecord"
 
-    def __init__(self, songs_path=None):
+    def __init__(self, songs_path=None, processed_filepath=None):
 
         # If no songs path is specified, look for default path in root directory
         if not songs_path:
@@ -31,11 +34,16 @@ class IOHandler(object):
 
         self.songs_path = songs_path
 
+        if not processed_filepath:
+            self.processed_filepath = path.join(self.songs_path, IOHandler.PROCESSED_FILENAME)
+        else:
+            self.processed_filepath = processed_filepath
+
         # Make a cashed folder inside the songs folder
         # This folder will contain all the .wave files
         # which are currently being processed
         if path.exists(self.songs_path):
-            self.cashed_path = path.join(self.songs_path, "cashed")
+            self.cashed_path = path.join(self.songs_path, IOHandler.CACHED_DIRECTORY)
             Path(path.join(self.cashed_path)).mkdir(parents=True, exist_ok=True)
 
     def get_source_path(self, song):
@@ -101,7 +109,10 @@ class IOHandler(object):
         if song_path.endswith(".mp3"):
             song_path = self.mp3_to_wav(song_path)
 
-        rate, audio_data = wavfile.read(song_path)
+        try:
+            rate, audio_data = wavfile.read(song_path)
+        except ValueError:
+            raise InvalidBitSizeException()
 
         return rate, audio_data.T[0]
 
@@ -137,7 +148,27 @@ class IOHandler(object):
                 os.remove(path.join(self.cashed_path, file))
 
     def check_cash(self):
+        """
+        Checks how many wave files are present in the cashed folder
+        :return: Amount of wave files in cashed folder
+        """
         return len([f for f in os.listdir(self.cashed_path) if path.isfile(path.join(self.cashed_path, f))])
+
+    def get_tf_record_writer(self):
+        writer = tf.io.TFRecordWriter(self.processed_filepath)
+
+        return writer
+
+    def build_tf_record_dataset(self):
+        if not self.processed_filepath:
+            return
+
+        # Build support for multiple files in processed directory
+        raw_dataset = tf.data.TFRecordDataset([self.processed_filepath])
+
+        dataset = raw_dataset.map(_parse_function)
+
+        return dataset
 
 def change_extension(song, from_ext=".mp3", to_ext=".wav"):
     """

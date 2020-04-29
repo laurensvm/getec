@@ -13,6 +13,7 @@ def download_playlists(songs_path, options=None):
         options = {
             'format': 'bestaudio/best',
             'ignoreerrors': True,
+            'cachedir': False,
 
             'download_archive': path.join(songs_path, "archive.txt"),
             'downloader': [{
@@ -33,19 +34,23 @@ def download_playlists(songs_path, options=None):
     playlist_genres["CLASSICAL"].append("https://www.youtube.com/playlist?list=PLxvodScTx2RtAOoajGSu6ad4p8P8uXKQk")
     playlist_genres["HOUSE"].append("https://www.youtube.com/playlist?list=PLhInz4M-OzRUsuBj8wF6383E7zm2dJfqZ")
     playlist_genres["TECHNO"]\
-        .append("https://www.youtube.com/watch?v=S12POcCZz4M&list=PL4jB1gXFL4TVF2XJwwlxk6Z7-IJWW2Q6")
+        .append("https://www.youtube.com/playlist?list=PLriDNoSeceaRvxOGeEDItXnNoJ-H1l9g8")
+
+    playlist_genres["HIPHOP"].append("https://www.youtube.com/playlist?list=PLvuMfxvpAQrkzez9insKS8cGPU74sK1Ss")
     playlist_genres["HIPHOP"].append("https://www.youtube.com/playlist?list=PLetgZKHHaF-Zq1Abh-ZGC4liPd_CV3Uo4")
     playlist_genres["JAZZ"].append("https://www.youtube.com/playlist?list=PL8F6B0753B2CCA128")
 
     for genre, playlists in playlist_genres.items():
         #TEMP
-        if genre == "ROCK" or genre == "JAZZ":
+        if genre == "ROCK" or genre == "JAZZ" or genre == "CLASSICAL" or genre == "HOUSE":
             continue
 
         logging.info("Downloading playlists from genre {0}".format(genre))
         options['outtmpl'] = path.join(songs_path, genre.lower(), '%(title)s.%(ext)s')
 
         with youtube_dl.YoutubeDL(options) as ydl:
+            # Remove the cache from previous downloads as errors might arise otherwise
+            ydl.cache.remove()
             try:
                 ydl.download(playlists)
             except (DownloadError, ExtractorError) as e:

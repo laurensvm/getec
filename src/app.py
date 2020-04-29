@@ -56,6 +56,14 @@ def parse_args():
              "network training. On first run, this argument must be enabled to gather data"
     )
 
+    parser.add_argument(
+        "--load_from_file", "-loadfile",
+        action="store_const",
+        const=True,
+        help="Load preprocessed audio data from the saved file to perform direct training. " +
+             "This will skip downloading songs and preprocessing them."
+    )
+
     return parser.parse_args()
 
 
@@ -106,26 +114,37 @@ class App(object):
         if not genres:
             genres = [g for g in Genre]
 
-        processed_songs = []
+        writer = self.io_handler.get_tf_record_writer()
 
         for genre in genres:
+            # i = 0
             song_paths = self.io_handler.get_filepaths_for_genre(genre)
 
             for song in song_paths:
-                rate, data = self.io_handler.read_wav_file(song)
+                try:
+                    rate, data = self.io_handler.read_wav_file(song)
+                except InvalidBitSizeException:
+                    continue
 
                 try:
                     data = self.preprocess_audio_data(rate, data, genre)
                 except (NotEnoughSamplesException, DataTypeException):
                     continue
 
-                processed_songs.append(data)
+                # Writes the data to the tf_record
+                to_tf_record_X(writer, data)
 
                 # Clear cash if more than 10 wav files in cashed folder
                 if self.io_handler.check_cash() > 10:
                     self.io_handler.clear_cash()
 
-        self.train_model(processed_songs)
+                # TEMP
+                # if i >= 10:
+                    # break
+                # i += 1
+
+        writer.close()
+        # self.train_model(processed_songs)
 
     def preprocess_audio_data(self, rate, data, genre):
         if not isinstance(data, np.ndarray):
@@ -147,20 +166,23 @@ class App(object):
         # First column of the matrix is the encoded genre
         return np.append(label_encoding, spectrogram, axis=1)
 
-    def train_model(self, processed_data):
+    def train_model(self, batch_size=16):
         model = build_recurrent_network()
 
-        genre_encodings = list(map(lambda x: x[:,0], processed_data))
-        y_train = PreProcessor.encode_genre_to_vector(genre_encodings)
-        x_train = list(map(lambda x: x[:, 1:], processed_data))
+        dataset = self.io_handler.build_tf_record_dataset()
+        dataset = dataset.shuffle(batch_size * 100)
 
-        input = np.array(x_train)
-        model.fit(input, np.array(y_train), epochs=5)
+        for processed_data in dataset.batch(batch_size):
+            X, y = PreProcessor.transform_matrix_to_sets(processed_data)
+            model.fit(X, y, epochs=20)
 
-        preds = model.predict(input)
+        set = dataset.batch(batch_size)
+        X, y = PreProcessor.transform_matrix_to_sets(set)
+        preds = model.predict(X)
 
-        print(preds)
-        print(np.argmax(preds), np.array(y_train))
+        print([np.argmax(pred) for pred in preds], y)
+        print(get_accuracy_measure(preds, y))
+
 
     def download_data(self):
         logging.info("Downloading audio data from youtube playlists specified in downloader.py")
@@ -175,8 +197,11 @@ class App(object):
         except DataTypeException:
             return
 
+
 if __name__ == "__main__":
     args = parse_args()
     app = App(args)
-    # app.download_data()
-    app.perform_batch_preprocessing()
+
+    # app.perform_batch_preprocessing()
+    app.train_model()
+

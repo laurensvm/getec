@@ -129,3 +129,29 @@ class PreProcessor(object):
         else:
             return genre.value
 
+    @staticmethod
+    def transform_matrix_to_sets(data):
+        X = []
+        y = []
+
+        for d in data:
+            d = d.numpy()
+
+            genre_encodings = d[:, 0]
+            _y = genre_encodings[0]
+            _X = d[:, 1:]
+
+            X.append(_X)
+            y.append(_y)
+
+        return np.array(X), np.array(y)
+
+        #
+        #
+        # processed_data = list(map(lambda x: x.numpy(), data))
+        #
+        # genre_encodings = list(map(lambda x: x[:, 0], processed_data))
+        # y_train = genre_encodings[0]
+        # x_train = list(map(lambda x: x[:, 1:], processed_data))
+        #
+        # input = np.array(x_train)
