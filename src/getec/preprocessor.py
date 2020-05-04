@@ -3,10 +3,16 @@ import numpy as np
 
 from scipy import signal
 from skimage.measure import block_reduce
+from random import randint
 import matplotlib.pyplot as plt
+import tensorflow as tf
 
-from .exceptions import DownSampleException, NotEnoughSamplesException
-from .genre import Genre
+# from .formatter import to_tf_record_X_y
+from .exceptions import (DownSampleException,
+                         NotEnoughSamplesException,
+                         RateException,
+                         DataTypeException
+                         )
 
 class PreProcessor(object):
     """
@@ -50,6 +56,73 @@ class PreProcessor(object):
         return sample_fragment
 
     @staticmethod
+    def get_audio_fragments(data, rate=RATE, n=10, sec=3):
+        total_length = len(data)
+        samples = []
+
+        # Check if the sample has at least 120 seconds of sound
+        if total_length < 2 * 60 * rate:
+            raise NotEnoughSamplesException()
+
+        # Strip the first and last 30 seconds
+        begin_idx = 30 * rate
+        end_idx = total_length - 30 * rate
+
+        for _ in range(n):
+            rand_idx = randint(begin_idx, end_idx - sec * rate)
+
+            sample = data[rand_idx: rand_idx + sec * rate]
+            samples.append(sample)
+
+        return samples
+
+    @staticmethod
+    def spectrogram(samples, sample_rate, stride_ms=10.0,
+                    window_ms=20.0, eps=1e-14):
+        """
+        Replaced by scipy.spectrogram
+        :param samples:
+        :param sample_rate:
+        :param stride_ms:
+        :param window_ms:
+        :param eps:
+        :return:
+        """
+        samples = samples.astype(np.int16)
+
+        stride_size = int(0.001 * sample_rate * stride_ms)
+        window_size = int(0.001 * sample_rate * window_ms)
+
+        # Extract strided windows
+        truncate_size = (len(samples) - window_size) % stride_size
+        samples = samples[:len(samples) - truncate_size]
+        nshape = (window_size, (len(samples) - window_size) // stride_size + 1)
+        nstrides = (samples.strides[0], samples.strides[0] * stride_size)
+        windows = np.lib.stride_tricks.as_strided(samples,
+                                                  shape=nshape, strides=nstrides)
+
+        assert np.all(windows[:, 1] == samples[stride_size:(stride_size + window_size)])
+
+        # Window weighting, squared Fast Fourier Transform (fft), scaling
+        weighting = np.hanning(window_size)[:, None]
+
+        fft = np.fft.rfft(windows * weighting, axis=0)
+        fft = np.absolute(fft)
+        fft = fft ** 2
+
+        scale = np.sum(weighting ** 2) * sample_rate
+        fft[1:-1, :] *= (2.0 / scale)
+        fft[(0, -1), :] /= scale
+
+        # Prepare fft frequency list
+        freqs = float(sample_rate) / window_size * np.arange(fft.shape[0])
+
+        # Compute spectrogram feature
+        # ind = np.where(freqs <= max_freq)[0][-1] + 1
+        specgram = np.log(fft + eps)
+        return specgram
+
+    @staticmethod
     def get_spectrogram_data(data, rate=RATE, nwindow=None):
         """
         Gets the spectrogram representation of the data
@@ -87,6 +160,11 @@ class PreProcessor(object):
         return freq, max_pooled_samples
 
     @staticmethod
+    def average_pool_spectrogram(spectrogram, block_size=(401, 1)):
+        average_pooled_samples = block_reduce(spectrogram, block_size, np.mean)
+        return average_pooled_samples
+
+    @staticmethod
     def plot_spectrogram(spectrogram, time=None, freq=None):
         """
         Plots the spectrogram
@@ -105,6 +183,18 @@ class PreProcessor(object):
         plt.show()
 
     @staticmethod
+    def imshow_spectrogram(spectrogram):
+        fig = plt.figure()
+
+        ax = fig.add_subplot(111)
+        ax.set_title("colorMap")
+        plt.imshow(spectrogram)
+        ax.set_aspect("equal")
+        plt.colorbar(orientation="vertical")
+
+        plt.show()
+
+    @staticmethod
     def normalize_spectrogram(s):
         """
         Normalizes the spectrogram into values ranging from [0, 1]
@@ -116,42 +206,37 @@ class PreProcessor(object):
         return s
 
     @staticmethod
-    def encode_genre_to_vector(genre):
-        """
-        This method takes a genre and returns a vector with zeros except
-        for the index of the corresponding genre.
-        :param genre:
-        :return:
-        """
+    def preprocess_audio_data(rate, data, genre):
+        if not isinstance(data, np.ndarray):
+            raise DataTypeException()
 
-        if type(genre) == list:
-            return np.fromiter(map(lambda x: x[0], genre), dtype=np.int8)
-        else:
-            return genre.value
+        # if self.downsample:
+        #     data = PreProcessor.downsample(data, rate)
+        if rate != PreProcessor.RATE:
+            raise RateException()
+
+        samples = PreProcessor.get_audio_fragments(data, n=20)
+        processed = []
+
+        for sample in samples:
+
+            # First get the spectrogram representation. Then use max pooling to reduce the dimensionality
+            freq, time, spectrogram = PreProcessor.get_spectrogram_data(sample, nwindow=int(0.2 * rate))
+            spectrogram = PreProcessor.average_pool_spectrogram(spectrogram)
+
+            spectrogram = PreProcessor.normalize_spectrogram(spectrogram)
+
+            if not np.any(np.isnan(spectrogram)):
+                # Writes the data to the tf_record
+                processed.append((spectrogram, genre.value))
+
+        return processed
 
     @staticmethod
-    def transform_matrix_to_sets(data):
-        X = []
-        y = []
+    def reshape_for_convnet(X):
+        shape = tf.shape(X)
+        return tf.reshape(X, [shape[0], shape[1], shape[2], 1])
 
-        for d in data:
-            d = d.numpy()
-
-            genre_encodings = d[:, 0]
-            _y = genre_encodings[0]
-            _X = d[:, 1:]
-
-            X.append(_X)
-            y.append(_y)
-
-        return np.array(X), np.array(y)
-
-        #
-        #
-        # processed_data = list(map(lambda x: x.numpy(), data))
-        #
-        # genre_encodings = list(map(lambda x: x[:, 0], processed_data))
-        # y_train = genre_encodings[0]
-        # x_train = list(map(lambda x: x[:, 1:], processed_data))
-        #
-        # input = np.array(x_train)
+    @staticmethod
+    def reshape_for_rnn(data):
+        return data[0], data[1]

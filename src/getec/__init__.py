@@ -1,10 +1,11 @@
-from .io_handler import IOHandler
+from .io import IOHandler
 from .preprocessor import PreProcessor
 from .genre import Genre
 from .exceptions import *
 
-from .network import build_recurrent_network
+from .network import ConvNet, RecurrentNet
+from .dataset import Dataset
 from .downloader import download_playlists
 
-from .formatter import *
-from .measures import *
+# from .formatter import *
+# from .measures import *

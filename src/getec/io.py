@@ -6,13 +6,9 @@ from shutil import copyfile
 from pydub import AudioSegment
 from scipy.io import wavfile
 
-import numpy as np
-import tensorflow as tf
 import logging
 
-from .genre import Genre
 from .exceptions import PathDoesNotExistException, FileExtensionException, InvalidBitSizeException
-from .formatter import _parse_function
 
 
 class IOHandler(object):
@@ -29,15 +25,10 @@ class IOHandler(object):
 
         # If no songs path is specified, look for default path in root directory
         if not songs_path:
-            basedir = path.dirname(path.dirname(path.dirname(path.realpath(__file__))))
-            songs_path = path.join(basedir, IOHandler.SONGS_DIRECTORY)
+            self.basedir = path.dirname(path.dirname(path.dirname(path.realpath(__file__))))
+            songs_path = path.join(self.basedir, IOHandler.SONGS_DIRECTORY)
 
         self.songs_path = songs_path
-
-        if not processed_filepath:
-            self.processed_filepath = path.join(self.songs_path, IOHandler.PROCESSED_FILENAME)
-        else:
-            self.processed_filepath = processed_filepath
 
         # Make a cashed folder inside the songs folder
         # This folder will contain all the .wave files
@@ -46,14 +37,14 @@ class IOHandler(object):
             self.cashed_path = path.join(self.songs_path, IOHandler.CACHED_DIRECTORY)
             Path(path.join(self.cashed_path)).mkdir(parents=True, exist_ok=True)
 
-    def get_source_path(self, song):
-        """
-        Returns the full path of the song given that the song
-        resides in the songs path
-        :param song:
-        :return:
-        """
-        return path.join(self.songs_path, song)
+        # Make a filepath for the processed.tfrecord dataset
+        if not processed_filepath:
+            self.processed_filepath = path.join(self.basedir, IOHandler.PROCESSED_FILENAME)
+        else:
+            self.processed_filepath = processed_filepath
+
+        # Make a directory for the saved models
+        self.model_directory = path.join(self.basedir, "saved_models")
 
     def mp3_to_wav(self, song_path):
         """
@@ -91,11 +82,11 @@ class IOHandler(object):
 
         return cashed_source_path
 
-    def read_wav_file(self, song_path):
+    def read(self, song_path):
         """
         Reads a wave file from the file system and returns a numpy array with the
         audio data, as well as the sample rate
-        :param src:
+        :param song_path:
         :return:
         """
 
@@ -126,17 +117,17 @@ class IOHandler(object):
         genre_path = path.join(self.songs_path, genre.name.lower())
         if path.exists(genre_path):
             song_paths = [s for s in os.listdir(genre_path) if path.isfile(path.join(genre_path, s))]
-            return [path.join(genre_path, s) for s in song_paths if not s.startswith(".")]
-        return []
+            return [{"name": s, "path": genre_path} for s in song_paths if not s.startswith(".")]
+        return [{}]
 
-    def build_filepath(self, filename, genre):
-        filepath = path.join(self.songs_path, genre.name.lower(), filename)
-        if path.exists(filepath):
-            return filepath
-        elif path.exists(filename):
-            return filename
-        else:
-            raise PathDoesNotExistException()
+    # def build_filepath(self, filename, genre):
+    #     filepath = path.join(self.songs_path, genre.name.lower(), filename)
+    #     if path.exists(filepath):
+    #         return filepath
+    #     elif path.exists(filename):
+    #         return filename
+    #     else:
+    #         raise PathDoesNotExistException()
 
     def clear_cash(self):
         """
@@ -154,21 +145,19 @@ class IOHandler(object):
         """
         return len([f for f in os.listdir(self.cashed_path) if path.isfile(path.join(self.cashed_path, f))])
 
-    def get_tf_record_writer(self):
-        writer = tf.io.TFRecordWriter(self.processed_filepath)
+    # def get_tf_record_writer(self):
+    #     return tf.io.TFRecordWriter(self.processed_filepath)
+    #
+    # def build_tf_record_dataset(self):
+    #     # Build support for multiple files in processed directory
+    #     return tf.data.TFRecordDataset([self.processed_filepath]).map(_parse_function)
 
-        return writer
+    def get_model_filepath(self, name="generic_model"):
+        return path.join(self.model_directory, name)
 
-    def build_tf_record_dataset(self):
-        if not self.processed_filepath:
-            return
+    def get_model_directory(self):
+        return self.model_directory
 
-        # Build support for multiple files in processed directory
-        raw_dataset = tf.data.TFRecordDataset([self.processed_filepath])
-
-        dataset = raw_dataset.map(_parse_function)
-
-        return dataset
 
 def change_extension(song, from_ext=".mp3", to_ext=".wav"):
     """

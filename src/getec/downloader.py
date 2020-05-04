@@ -32,18 +32,20 @@ def download_playlists(songs_path, options=None):
     # Add playlist links
     playlist_genres["ROCK"].append("https://www.youtube.com/playlist?list=PL6Lt9p1lIRZ311J9ZHuzkR5A3xesae2pk")
     playlist_genres["CLASSICAL"].append("https://www.youtube.com/playlist?list=PLxvodScTx2RtAOoajGSu6ad4p8P8uXKQk")
+    playlist_genres["CLASSICAL"].append("https://www.youtube.com/playlist?list=PL2788304DC59DBEB4")
+    playlist_genres["CLASSICAL"].append("https://www.youtube.com/playlist?list=PL68AC80CBF3649BBB")
     playlist_genres["HOUSE"].append("https://www.youtube.com/playlist?list=PLhInz4M-OzRUsuBj8wF6383E7zm2dJfqZ")
     playlist_genres["TECHNO"]\
         .append("https://www.youtube.com/playlist?list=PLriDNoSeceaRvxOGeEDItXnNoJ-H1l9g8")
 
     playlist_genres["HIPHOP"].append("https://www.youtube.com/playlist?list=PLvuMfxvpAQrkzez9insKS8cGPU74sK1Ss")
-    playlist_genres["HIPHOP"].append("https://www.youtube.com/playlist?list=PLetgZKHHaF-Zq1Abh-ZGC4liPd_CV3Uo4")
+    # playlist_genres["HIPHOP"].append("https://www.youtube.com/playlist?list=PLetgZKHHaF-Zq1Abh-ZGC4liPd_CV3Uo4")
     playlist_genres["JAZZ"].append("https://www.youtube.com/playlist?list=PL8F6B0753B2CCA128")
 
     for genre, playlists in playlist_genres.items():
         #TEMP
-        if genre == "ROCK" or genre == "JAZZ" or genre == "CLASSICAL" or genre == "HOUSE":
-            continue
+        # if genre == "ROCK" or genre == "JAZZ" or genre == "CLASSICAL" or genre == "HOUSE":
+        #     continue
 
         logging.info("Downloading playlists from genre {0}".format(genre))
         options['outtmpl'] = path.join(songs_path, genre.lower(), '%(title)s.%(ext)s')

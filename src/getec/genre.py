@@ -16,6 +16,7 @@ class Genre(Enum):
     def count():
         return len([g for g in Genre])
 
-    def from_directory_name(self, dirname):
+    @staticmethod
+    def from_directory_name(dirname):
         return Genre[dirname.upper()]
 

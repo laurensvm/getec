@@ -5,3 +5,5 @@ env/
 *.gitattributes
 __pycache__/
 songs/
+*.tfrecord
+saved_models/

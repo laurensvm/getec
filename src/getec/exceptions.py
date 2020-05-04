@@ -37,3 +37,10 @@ class DataTypeException(Exception):
 class InvalidBitSizeException(Exception):
     def __init__(self):
         logging.error("The wave file could not be read as it might have an invalid bit size")
+
+
+class RateException(Exception):
+    def __init__(self):
+        logging.error("The file's audio rate is not 44100Hz, and downsampling is disabled. Skipping file")
+
+
