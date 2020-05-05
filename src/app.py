@@ -67,6 +67,11 @@ def parse_args():
              "This will skip downloading songs and preprocessing them."
     )
 
+    parser.add_argument(
+        "--predict_from_youtube_video", "-predict_youtube_video",
+        help="Enter a url, and the application will download the youtube song, analyse it, and predict the genre"
+    )
+
     return parser.parse_args()
 
 
@@ -96,6 +101,9 @@ class App(object):
             self.download_data()
 
         self.dataset = Dataset(self.io.processed_filepath)
+
+        if args.predict_from_youtube_video:
+            self.predict_genre_for_youtube_video(args.predict_from_youtube_video)
 
 
     def configure_logging(self):
@@ -182,18 +190,19 @@ class App(object):
     #     print(get_accuracy_measure(preds, y))
 
     def train_model(self, batch_size=128, buffer_size=10000):
-        dataset = Dataset(self.io.processed_filepath, buffer_size=buffer_size)
 
         model = ConvNet(self.io.model_directory)
         model.load()
 
-        train_ds = dataset.get_training_set()
-        val_ds = dataset.get_validation_set()
+        train_ds = self.dataset.get_training_set()
+        val_ds = self.dataset.get_validation_set()
 
         model.train(train_ds, val_ds=val_ds)
 
+        model.save()
+
         # Test model
-        test_ds = dataset.get_test_set()
+        test_ds = self.dataset.get_test_set()
 
         losses = model.evaluate(test_ds)
 
@@ -205,15 +214,40 @@ class App(object):
         logging.info("Downloading audio data from youtube playlists specified in downloader.py")
         download_playlists(self.io.songs_path)
 
-    def preprocess_file(self, filename, genre):
-        filepath = self.io.build_filepath(filename, genre)
-        rate, data = self.io.read(filepath)
+    def preprocess_file(self, filename, genre=None):
+        if self.io.ispath(filename):
+            rate, data = self.io.read(filename)
+        else:
+            filepath = self.io.build_filepath(filename, genre)
+            rate, data = self.io.read(filepath)
 
         try:
             return PreProcessor.preprocess_audio_data(rate, data, genre)
         except DataTypeException:
             return
 
+    def predict_genre_for_file(self, filepath):
+        processed = self.preprocess_file(filepath)
+
+        model = ConvNet(self.io.model_directory)
+        model.load()
+
+        preds = model.predict(np.array(processed))
+
+        preds = list(map(lambda x: np.argmax(x), preds))
+
+        from collections import Counter
+        c = Counter(preds)
+
+        first = c.most_common(1)[0]
+        # sec = c.most_common(2)[1]
+        print("Predicted class is: {0} with {1} / 20 classifications".format(Genre(first[0]), first[1]))
+        # print("Second predicted class: {0} with {1} / 20 classifications".format(Genre(sec[0]), sec[1]))
+
+    def predict_genre_for_youtube_video(self, url):
+        filepath = download_song(self.io.get_temp_filepath(), url)
+
+        self.predict_genre_for_file(filepath)
 
 if __name__ == "__main__":
     args = parse_args()
@@ -222,5 +256,5 @@ if __name__ == "__main__":
     # app.download_data()
 
     # app.perform_batch_preprocessing()
-    app.train_model()
+    # app.train_model()
 

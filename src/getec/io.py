@@ -158,6 +158,12 @@ class IOHandler(object):
     def get_model_directory(self):
         return self.model_directory
 
+    def ispath(self, filename):
+        return path.exists(filename)
+
+    def get_temp_filepath(self):
+        return path.join(self.basedir, "tmp")
+
 
 def change_extension(song, from_ext=".mp3", to_ext=".wav"):
     """

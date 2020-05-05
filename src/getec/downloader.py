@@ -1,5 +1,6 @@
 import youtube_dl
 import logging
+import time
 
 from youtube_dl.utils import DownloadError, ExtractorError
 
@@ -57,3 +58,35 @@ def download_playlists(songs_path, options=None):
                 ydl.download(playlists)
             except (DownloadError, ExtractorError) as e:
                 logging.error(e)
+
+
+def download_song(_path, url, options=None):
+    t = time.localtime()
+    outtmpl = time.strftime("%H-%M-%S", t)
+
+    if not options:
+        options = {
+            'format': 'bestaudio/best',
+            'ignoreerrors': True,
+            'cachedir': False,
+            'outtmpl': path.join(_path, '{0}.%(ext)s'.format(outtmpl)),
+            'downloader': [{
+               'continuedl': True
+            }],
+            'postprocessor_args': ["-ar", "44100"],
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '320',
+            }],
+        }
+
+    with youtube_dl.YoutubeDL(options) as ydl:
+        # Remove the cache from previous downloads as errors might arise otherwise
+        ydl.cache.remove()
+        try:
+            ydl.download([url])
+        except (DownloadError, ExtractorError) as e:
+            logging.error(e)
+
+    return path.join(_path, outtmpl + ".mp3")

@@ -7,3 +7,4 @@ __pycache__/
 songs/
 *.tfrecord
 saved_models/
+tmp/

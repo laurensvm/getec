@@ -3,6 +3,7 @@ import os
 
 import tensorflow as tf
 from tensorflow.keras import layers
+import numpy as np
 
 from .genre import Genre
 
@@ -93,6 +94,12 @@ class ConvNet(Network):
         test_ds = test_ds.map(self._reshape).batch(128)
 
         return self.model.evaluate(test_ds)
+
+    def predict(self, X):
+        if isinstance(X, np.ndarray):
+            X = np.reshape(X, (X.shape[0], X.shape[1], X.shape[2], 1))
+
+        return self.model.predict(X)
 
 
 class RecurrentNet(Network):

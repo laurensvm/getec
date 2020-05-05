@@ -210,8 +210,6 @@ class PreProcessor(object):
         if not isinstance(data, np.ndarray):
             raise DataTypeException()
 
-        # if self.downsample:
-        #     data = PreProcessor.downsample(data, rate)
         if rate != PreProcessor.RATE:
             raise RateException()
 
@@ -227,8 +225,10 @@ class PreProcessor(object):
             spectrogram = PreProcessor.normalize_spectrogram(spectrogram)
 
             if not np.any(np.isnan(spectrogram)):
-                # Writes the data to the tf_record
-                processed.append((spectrogram, genre.value))
+                if genre:
+                    processed.append((spectrogram, genre.value))
+                else:
+                    processed.append(spectrogram)
 
         return processed
 
