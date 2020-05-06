@@ -8,9 +8,12 @@ import numpy as np
 from .genre import Genre
 
 class Network(object):
-    def __init__(self, model_directory, model=None):
+    def __init__(self, model_directory, model=None, uid=None):
         self.model = model
-        self.model_filepath = os.path.join(model_directory, self.__class__.__name__)
+        if uid:
+            self.model_filepath = os.path.join(model_directory, self.__class__.__name__ + uid)
+        else:
+            self.model_filepath = os.path.join(model_directory, self.__class__.__name__)
 
     def _get_callbacks(self):
         early_stopping = tf.keras.callbacks.EarlyStopping(
@@ -45,6 +48,9 @@ class Network(object):
 
     def predict(self, X):
         return self.model.predict(X)
+
+    def predict_visualize_layers(self, X):
+        pass
 
 
 class ConvNet(Network):
@@ -100,6 +106,20 @@ class ConvNet(Network):
             X = np.reshape(X, (X.shape[0], X.shape[1], X.shape[2], 1))
 
         return self.model.predict(X)
+
+    def predict_visualize_layers(self, X):
+
+        if isinstance(X, np.ndarray):
+            X = np.reshape(X, (X.shape[0], X.shape[1], X.shape[2], 1))
+        elif isinstance(X, tf.data.Dataset):
+            X = X.map(self._reshape).batch(128)
+
+        layer_outputs = [layer.output for layer in self.model.layers]
+        visualisation_model = tf.keras.models.Model(inputs=self.model.input, outputs=layer_outputs)
+
+        visualisations = visualisation_model.predict(X)
+
+        print(visualisations)
 
 
 class RecurrentNet(Network):

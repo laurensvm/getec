@@ -19,7 +19,7 @@ class IOHandler(object):
 
     SONGS_DIRECTORY = "songs"
     CACHED_DIRECTORY = "cached"
-    PROCESSED_FILENAME = "processed.tfrecord"
+    PROCESSED_FILENAME = "processed_sec1.tfrecord"
 
     def __init__(self, songs_path=None, processed_filepath=None):
 

@@ -152,47 +152,10 @@ class App(object):
 
         writer.close()
 
-    # def train_model(self, batch_size=128, buffer_size=10000):
-    #     # model = build_convolutional_network()
-    #     model = tf.keras.models.load_model(self.io.get_model_filepath())
-    #
-    #     dataset = self.io.build_tf_record_dataset().cache()
-    #     dataset = dataset.shuffle(buffer_size, reshuffle_each_iteration=True).repeat()
-    #
-    #     callbacks = get_callbacks(self.io.get_model_filepath())
-    #
-    #     # test = dataset.take(780)
-    #
-    #     # dataset = dataset.skip(780)
-    #
-    #     epochs = 1000
-    #     for _ in range(epochs):
-    #         for X, y in dataset.batch(200 * batch_size):
-    #             X = PreProcessor.reshape_for_convnet(X)
-    #
-    #             model.fit(X, y, callbacks=callbacks)
-    #
-    #     model.save(self.io.get_model_filepath())
-    #
-    #     # n_model = tf.keras.models.load_model(self.io_handler.get_model_filepath())
-    #
-    #     # set = iter(dataset.batch(batch_size)).next()
-    #     X, y = PreProcessor.transform_matrix_to_sets(test)
-    #     preds = model.predict(X)
-    #
-    #     conf_matrix = confusion_matrix([np.argmax(pred) for pred in preds], y)
-    #     plt.matshow(conf_matrix)
-    #     for (x, z), value in np.ndenumerate(conf_matrix):
-    #         plt.text(x, z, f"{value:.2f}", va="center", ha="center")
-    #     plt.show()
-    #
-    #     print([np.argmax(pred) for pred in preds], y)
-    #     print(get_accuracy_measure(preds, y))
+    def train_model(self):
 
-    def train_model(self, batch_size=128, buffer_size=10000):
-
-        model = ConvNet(self.io.model_directory)
-        model.load()
+        model = ConvNet(self.io.model_directory, name="sec1")
+        model.build(input_shape=(11, 29, 1))
 
         train_ds = self.dataset.get_training_set()
         val_ds = self.dataset.get_validation_set()
@@ -201,14 +164,16 @@ class App(object):
 
         model.save()
 
+    def test_model(self):
+        model = ConvNet(self.io.model_directory, name="sec1")
+        model.load()
+
         # Test model
         test_ds = self.dataset.get_test_set()
 
         losses = model.evaluate(test_ds)
 
         print("\n", losses[0], losses[1])
-
-
 
     def download_data(self):
         logging.info("Downloading audio data from youtube playlists specified in downloader.py")
@@ -251,10 +216,11 @@ class App(object):
 
 if __name__ == "__main__":
     args = parse_args()
+
     app = App(args)
 
     # app.download_data()
 
     # app.perform_batch_preprocessing()
-    # app.train_model()
+    app.train_model()
 

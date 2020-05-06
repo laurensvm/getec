@@ -71,7 +71,7 @@ class PreProcessor(object):
         for _ in range(n):
             rand_idx = randint(begin_idx, end_idx - sec * rate)
 
-            sample = data[rand_idx: rand_idx + sec * rate]
+            sample = data[rand_idx: rand_idx + int(sec * rate)]
             samples.append(sample)
 
         return samples
@@ -183,12 +183,12 @@ class PreProcessor(object):
         plt.show()
 
     @staticmethod
-    def imshow_spectrogram(spectrogram):
+    def imshow(matrix):
         fig = plt.figure()
 
         ax = fig.add_subplot(111)
         ax.set_title("colorMap")
-        plt.imshow(spectrogram)
+        plt.imshow(matrix)
         ax.set_aspect("equal")
         plt.colorbar(orientation="vertical")
 
@@ -213,7 +213,7 @@ class PreProcessor(object):
         if rate != PreProcessor.RATE:
             raise RateException()
 
-        samples = PreProcessor.get_audio_fragments(data, n=20)
+        samples = PreProcessor.get_audio_fragments(data, n=10, sec=1.5)
         processed = []
 
         for sample in samples:
