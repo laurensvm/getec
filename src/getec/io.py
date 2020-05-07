@@ -19,7 +19,8 @@ class IOHandler(object):
 
     SONGS_DIRECTORY = "songs"
     CACHED_DIRECTORY = "cached"
-    PROCESSED_FILENAME = "processed_sec1.tfrecord"
+    PROCESSED_FILENAME = "processed.tfrecord"
+    IMAGE_DIRECTORY = "figs"
 
     def __init__(self, songs_path=None, processed_filepath=None):
 
@@ -120,15 +121,6 @@ class IOHandler(object):
             return [{"name": s, "path": genre_path} for s in song_paths if not s.startswith(".")]
         return [{}]
 
-    # def build_filepath(self, filename, genre):
-    #     filepath = path.join(self.songs_path, genre.name.lower(), filename)
-    #     if path.exists(filepath):
-    #         return filepath
-    #     elif path.exists(filename):
-    #         return filename
-    #     else:
-    #         raise PathDoesNotExistException()
-
     def clear_cash(self):
         """
         Clears all .wav files in the cash folder
@@ -145,13 +137,6 @@ class IOHandler(object):
         """
         return len([f for f in os.listdir(self.cashed_path) if path.isfile(path.join(self.cashed_path, f))])
 
-    # def get_tf_record_writer(self):
-    #     return tf.io.TFRecordWriter(self.processed_filepath)
-    #
-    # def build_tf_record_dataset(self):
-    #     # Build support for multiple files in processed directory
-    #     return tf.data.TFRecordDataset([self.processed_filepath]).map(_parse_function)
-
     def get_model_filepath(self, name="generic_model"):
         return path.join(self.model_directory, name)
 
@@ -163,6 +148,9 @@ class IOHandler(object):
 
     def get_temp_filepath(self):
         return path.join(self.basedir, "tmp")
+
+    def get_image_directory(self):
+        return path.join(path.dirname(self.basedir), IOHandler.IMAGE_DIRECTORY)
 
 
 def change_extension(song, from_ext=".mp3", to_ext=".wav"):

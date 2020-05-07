@@ -3,7 +3,7 @@ from .preprocessor import PreProcessor
 from .genre import Genre
 from .exceptions import *
 
-from .network import ConvNet, RecurrentNet
+from .network import ConvNet, RecurrentNet, ConvucurrentNet
 from .dataset import Dataset
 from .downloader import download_playlists, download_song
 

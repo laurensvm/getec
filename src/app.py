@@ -154,8 +154,13 @@ class App(object):
 
     def train_model(self):
 
-        model = ConvNet(self.io.model_directory, name="sec1")
-        model.build(input_shape=(11, 29, 1))
+        model = ConvucurrentNet(self.io.model_directory)
+        # model.build(input_shape=(11, 24, 1))
+        # model.build(input_shape=(11, 14))
+        model.build()
+
+        # In case there exists a model
+        model.load()
 
         train_ds = self.dataset.get_training_set()
         val_ds = self.dataset.get_validation_set()
@@ -165,7 +170,7 @@ class App(object):
         model.save()
 
     def test_model(self):
-        model = ConvNet(self.io.model_directory, name="sec1")
+        model = ConvNet(self.io.model_directory, uid="sec1")
         model.load()
 
         # Test model
@@ -191,10 +196,10 @@ class App(object):
         except DataTypeException:
             return
 
-    def predict_genre_for_file(self, filepath):
+    def predict_genre_for_file(self, filepath, network=ConvNet):
         processed = self.preprocess_file(filepath)
 
-        model = ConvNet(self.io.model_directory)
+        model = network(self.io.model_directory)
         model.load()
 
         preds = model.predict(np.array(processed))
@@ -213,6 +218,8 @@ class App(object):
         filepath = download_song(self.io.get_temp_filepath(), url)
 
         self.predict_genre_for_file(filepath)
+
+
 
 if __name__ == "__main__":
     args = parse_args()
