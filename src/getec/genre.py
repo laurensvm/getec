@@ -11,6 +11,7 @@ class Genre(Enum):
     HOUSE = 3
     TECHNO = 4
     HIPHOP = 5
+    BALLAD = 6
 
     @staticmethod
     def count():

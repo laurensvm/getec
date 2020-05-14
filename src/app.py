@@ -147,38 +147,41 @@ class App(object):
                     writer.write(self.dataset.to_tf_record_X_y(X, y))
 
                 # Clear cash if more than 10 wav files in cashed folder
-                if self.io.check_cash() > 10:
-                    self.io.clear_cash()
+                if self.io.check_cache() > 10:
+                    self.io.clear_cache()
 
         writer.close()
 
-    def train_model(self):
+    def train_model(self, model=ConvocurrentNet):
 
-        model = ConvucurrentNet(self.io.model_directory)
-        # model.build(input_shape=(11, 24, 1))
-        # model.build(input_shape=(11, 14))
-        model.build()
+        _model = model(self.io.model_directory, uid="ballad")
+        # _model.build(input_shape=(11, 24, 1))
+        # _model.build(input_shape=(11, 14))
+        # _model.build(input_shape=(11, 9))
+        _model.build(input_shape=(11, 29))
 
         # In case there exists a model
-        model.load()
+        # _model.load()
 
         train_ds = self.dataset.get_training_set()
         val_ds = self.dataset.get_validation_set()
 
-        model.train(train_ds, val_ds=val_ds)
+        hist = _model.train(train_ds, val_ds=val_ds, epochs=1000)
 
-        model.save()
+        Visualizer(self.io.get_image_directory()).plot_history(hist.history, _model)
 
-    def test_model(self):
-        model = ConvNet(self.io.model_directory, uid="sec1")
-        model.load()
+        _model.save()
+
+    def test_model(self, model=ConvocurrentNet, uid=None):
+        _model = model(self.io.model_directory, uid=uid)
+        _model.load()
 
         # Test model
         test_ds = self.dataset.get_test_set()
 
-        losses = model.evaluate(test_ds)
+        stats = _model.evaluate(test_ds)
 
-        print("\n", losses[0], losses[1])
+        return stats
 
     def download_data(self):
         logging.info("Downloading audio data from youtube playlists specified in downloader.py")
@@ -219,6 +222,39 @@ class App(object):
 
         self.predict_genre_for_file(filepath)
 
+    def test_models_performance(self):
+        uids = ["sec1", "sec1_5", "sec2", "sec2_5", None]
+        models = [RecurrentNet, ConvocurrentNet, ConvNet, StandardNeuralNet]
+
+        stats = []
+        for _model in models:
+            _models = []
+            for _uid in uids:
+                model = _model(self.io.model_directory, uid=_uid)
+
+                try:
+                    model.load_or_error()
+                except OSError:
+                    continue
+
+                if _uid:
+                    test_ds = Dataset(self.io.get_processed_filepath(f"processed_{_uid}.tfrecord")).get_test_set()
+                else:
+                    test_ds = self.dataset.get_test_set()
+
+                evaluated = model.evaluate(test_ds)
+                _models.append((evaluated, model))
+            stats.append(_models)
+
+        Visualizer(self.io.get_image_directory()).plot_models_performances(stats)
+
+    def visualise_layers(self):
+        test_ds = self.dataset.get_test_set().take(1)
+
+        model = ConvNet(self.io.model_directory)
+        model.load_or_error()
+        model.predict_visualize_layers(test_ds)
+
 
 
 if __name__ == "__main__":
@@ -227,7 +263,10 @@ if __name__ == "__main__":
     app = App(args)
 
     # app.download_data()
-
+    # app.train_model()
     # app.perform_batch_preprocessing()
-    app.train_model()
+    # app.test_models_performance()
+    # app.test_model()
+
+    app.visualise_layers()
 

@@ -2,6 +2,7 @@ import logging
 import os
 
 import tensorflow as tf
+import matplotlib.pyplot as plt
 from tensorflow.keras import layers
 import numpy as np
 
@@ -11,6 +12,7 @@ from .genre import Genre
 class Network(object):
     def __init__(self, model_directory, model=None, uid=None):
         self.model = model
+        self.uid = uid
         if uid:
             self.model_filepath = os.path.join(model_directory, self.__class__.__name__ + uid)
         else:
@@ -54,9 +56,13 @@ class Network(object):
         except OSError:
             logging.error("Trying to load a model which does not exist. " +
                           "Creating the model instead")
+            self.build()
+
+    def load_or_error(self):
+        self.model = tf.keras.models.load_model(self.model_filepath)
 
     def train(self, train_ds, val_ds=None, epochs=1000):
-        callbacks = self._get_callbacks()
+        callbacks = self._get_callbacks(es_patience=150)
 
         train_ds = train_ds.map(self._reshape).batch(128)
         val_ds = val_ds.map(self._reshape).batch(128)
@@ -66,8 +72,9 @@ class Network(object):
                               epochs=epochs,
                               callbacks=callbacks)
 
-    def evaluate(self, X, y):
-        return self.model.evaluate(X, y)
+    def evaluate(self, ds):
+        ds = ds.map(self._reshape).batch(128)
+        return self.model.evaluate(ds)
 
     def predict(self, X):
         return self.model.predict(X)
@@ -138,15 +145,47 @@ class ConvNet(Network):
         if isinstance(X, np.ndarray):
             X = np.reshape(X, (X.shape[0], X.shape[1], X.shape[2], 1))
         elif isinstance(X, tf.data.Dataset):
-            X = X.map(self._reshape).batch(128)
+            X = X.map(self._reshape)
 
-        layer_outputs = [layer.output for layer in self.model.layers]
-        visualisation_model = tf.keras.models.Model(inputs=self.model.input, outputs=layer_outputs)
+        for x, y in X:
+            x = tf.expand_dims(x, 0)
 
-        visualisations = visualisation_model.predict(X)
+            plt.title("Test Sample Input")
+            plt.grid(False)
+            plt.imshow(x[0, :, :, 0], aspect='auto', cmap='plasma', origin='lower')
 
-        print(visualisations)
+            layer_outputs = [layer.output for layer in self.model.layers]
+            visualisation_model = tf.keras.models.Model(inputs=self.model.input, outputs=layer_outputs)
 
+            visualisations = visualisation_model.predict(x)
+
+            images_per_row = 4
+
+            for layer_name, layer_activation in zip(map(lambda x : x.name, layer_outputs[:3]), visualisations[:3]):
+                n_features = layer_activation.shape[-1]
+                size = layer_activation.shape[1:3]
+                n_cols = n_features // images_per_row
+                grid = np.zeros((size[0] * n_cols, images_per_row * size[1]))
+
+                for col in range(n_cols):
+                    for row in range(images_per_row):
+                        channel_image = layer_activation[0, :, :, col * images_per_row + row]
+                        channel_image -= channel_image.mean()
+                        channel_image /= channel_image.std()
+                        channel_image *= 64
+                        channel_image += 128
+                        channel_image = np.clip(channel_image, 0, 255).astype('uint8')
+                        grid[col * size[0]: (col + 1) * size[0], row * size[1]: (row + 1) * size[1]] = channel_image
+
+                plt.figure(figsize=(1. / size[0] * grid.shape[1], 3. / size[1] * grid.shape[0]))
+                plt.title(layer_name)
+                plt.grid(False)
+                plt.imshow(grid, aspect='auto', cmap='plasma', origin='lower')
+
+            pred = np.argmax(visualisations[-1])
+            print(f"Predicted class: {Genre(pred)} with probability {visualisations[-1][0][pred]}\n"
+                + f"Actual class: {Genre(y)}")
+            
 
 class RecurrentNet(Network):
     def __init__(self, *args, **kwargs):
@@ -159,9 +198,9 @@ class RecurrentNet(Network):
         optimizer = self._select_optimizer(optimizer)
 
         model = tf.keras.Sequential([
-            layers.SimpleRNN(256, input_shape=input_shape, return_sequences=True),
-            layers.SimpleRNN(128),
-            layers.Dense(256, activation="relu"),
+            layers.SimpleRNN(256, input_shape=input_shape, return_sequences=True, activation='relu'),
+            layers.SimpleRNN(128, activation='relu'),
+            layers.Dense(256, activation='relu'),
             # layers.SimpleRNN(256),
             # layers.Dense(128, activation="relu"),
             layers.Dropout(0.2),
@@ -190,7 +229,7 @@ class RecurrentNet(Network):
         self.model = model
 
     def train(self, train_ds, val_ds=None, epochs=1000):
-        callbacks = self._get_callbacks(es_patience=75)
+        callbacks = self._get_callbacks()
 
         train_ds = train_ds.map(self._reshape).batch(128)
         val_ds = val_ds.map(self._reshape).batch(128)
@@ -207,7 +246,7 @@ class StandardNeuralNet(Network):
 
     def build(self, input_shape=(11, 29),
               loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-              optimizer='adam'):
+              optimizer='sgd'):
 
         optimizer = self._select_optimizer(optimizer)
 
@@ -230,9 +269,9 @@ class StandardNeuralNet(Network):
         self.model = model
 
 
-class ConvucurrentNet(Network):
+class ConvocurrentNet(Network):
     def __init__(self, *args, **kwargs):
-        super(ConvucurrentNet, self).__init__(*args, **kwargs)
+        super(ConvocurrentNet, self).__init__(*args, **kwargs)
 
     def build(self, input_shape=(11, 29),
               loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
@@ -253,9 +292,9 @@ class ConvucurrentNet(Network):
         dense1 = layers.Dense(128, activation='relu')(flat)
 
         # The recurrent part of the network. We need to slice the input and extract fewer samples
-        extract = layers.Lambda(lambda x: x[:, :, 0: int(input_shape[1] / 2)])(_input)
+        # extract = layers.Lambda(lambda x: x[:, :, 0: int(input_shape[1] / 2)])(_input)
 
-        simple_rnn1 = layers.SimpleRNN(256, return_sequences=True)(extract)
+        simple_rnn1 = layers.SimpleRNN(256, return_sequences=True)(_input)
         simple_rnn2 = layers.SimpleRNN(128)(simple_rnn1)
         dense2 = layers.Dense(256, activation="relu")(simple_rnn2)
 

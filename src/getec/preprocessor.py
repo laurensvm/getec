@@ -69,7 +69,7 @@ class PreProcessor(object):
         end_idx = total_length - 30 * rate
 
         for _ in range(n):
-            rand_idx = randint(begin_idx, end_idx - sec * rate)
+            rand_idx = randint(begin_idx, end_idx - int(sec * rate))
 
             sample = data[rand_idx: rand_idx + int(sec * rate)]
             samples.append(sample)
@@ -213,7 +213,7 @@ class PreProcessor(object):
         if rate != PreProcessor.RATE:
             raise RateException()
 
-        samples = PreProcessor.get_audio_fragments(data, n=10, sec=1.5)
+        samples = PreProcessor.get_audio_fragments(data, n=20, sec=3)
         processed = []
 
         for sample in samples:

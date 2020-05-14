@@ -31,6 +31,7 @@ def download_playlists(songs_path, options=None):
     playlist_genres = { g.name: [] for g in Genre }
 
     # Add playlist links
+    playlist_genres["BALLAD"].append("https://www.youtube.com/playlist?list=PL-rFYrnzIalWsY6gkT7VDoYqpk8GL21cp")
     playlist_genres["ROCK"].append("https://www.youtube.com/playlist?list=PL6Lt9p1lIRZ311J9ZHuzkR5A3xesae2pk")
     playlist_genres["CLASSICAL"].append("https://www.youtube.com/playlist?list=PLxvodScTx2RtAOoajGSu6ad4p8P8uXKQk")
     playlist_genres["CLASSICAL"].append("https://www.youtube.com/playlist?list=PL2788304DC59DBEB4")
@@ -45,8 +46,8 @@ def download_playlists(songs_path, options=None):
 
     for genre, playlists in playlist_genres.items():
         #TEMP
-        # if genre == "ROCK" or genre == "JAZZ" or genre == "CLASSICAL" or genre == "HOUSE":
-        #     continue
+        if genre != "BALLAD":
+            continue
 
         logging.info("Downloading playlists from genre {0}".format(genre))
         options['outtmpl'] = path.join(songs_path, genre.lower(), '%(title)s.%(ext)s')

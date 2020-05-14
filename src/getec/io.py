@@ -121,7 +121,7 @@ class IOHandler(object):
             return [{"name": s, "path": genre_path} for s in song_paths if not s.startswith(".")]
         return [{}]
 
-    def clear_cash(self):
+    def clear_cache(self):
         """
         Clears all .wav files in the cash folder
         :return:
@@ -130,7 +130,7 @@ class IOHandler(object):
             if path.isfile(path.join(self.cashed_path, file)) and file.endswith(".wav"):
                 os.remove(path.join(self.cashed_path, file))
 
-    def check_cash(self):
+    def check_cache(self):
         """
         Checks how many wave files are present in the cashed folder
         :return: Amount of wave files in cashed folder
@@ -151,6 +151,9 @@ class IOHandler(object):
 
     def get_image_directory(self):
         return path.join(path.dirname(self.basedir), IOHandler.IMAGE_DIRECTORY)
+
+    def get_processed_filepath(self, name):
+        return path.join(self.basedir, name)
 
 
 def change_extension(song, from_ext=".mp3", to_ext=".wav"):
