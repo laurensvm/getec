@@ -4,6 +4,7 @@ from getec import *
 
 import os
 import numpy as np
+import seaborn as sn
 import matplotlib.pyplot as plt
 import tensorflow as tf
 
@@ -123,7 +124,14 @@ class App(object):
         logging.info("Logger initialised")
 
     def perform_batch_preprocessing(self, genres=None):
-        # If no list of genres is specified, perform preprocessing on all
+        """
+        Performs preprocessing of all the audio data.
+        If no list of genres is specified, perform preprocessing on all.
+        Processed files are saved to a .tfrecord dataset
+        :param genres: List of genres to perform preprocessing on
+        """
+
+
         if not genres:
             genres = [g for g in Genre]
 
@@ -152,16 +160,43 @@ class App(object):
 
         writer.close()
 
-    def train_model(self, model=ConvocurrentNet):
+    def train_convnet_filters(self, model=ConvNet):
+        """
+        Trains a convolutional neural network with different amounts
+        of kernels. This function should be removed
+        :param model: Type of network to train
+        """
+        hists = []
+        for i in [1, 2, 4, 8, 16]:
+            conv1_layer = int(64 / i)
+            conv2_layer = int(128 / i)
+            dense_layer = int(128 / i)
 
-        _model = model(self.io.model_directory, uid="ballad")
-        # _model.build(input_shape=(11, 24, 1))
-        # _model.build(input_shape=(11, 14))
-        # _model.build(input_shape=(11, 9))
-        _model.build(input_shape=(11, 29))
+            _model = model(self.io.model_directory, uid="minimal")
+            _model.build(input_shape=(11, 29, 1),
+                         conv1_units=conv1_layer,
+                         conv2_units=conv2_layer,
+                         dense_units=dense_layer)
+
+            train_ds = self.dataset.get_training_set()
+            val_ds = self.dataset.get_validation_set()
+
+            hists.append(_model.train(train_ds, val_ds=val_ds, epochs=400))
+
+        # Visualizer(self.io.get_image_directory()).plot_history(hist.history, _model)
+        Visualizer(self.io.get_image_directory()).plot_convolution_performance(hists)
+
+    def train_model(self, model=ConvNet):
+        """
+        Trains the network
+        :param model: Type of network to train
+        """
+
+        _model = model(self.io.model_directory)
+        _model.build(input_shape=(11, 29, 1), optimizer='adam')
 
         # In case there exists a model
-        # _model.load()
+        _model.load()
 
         train_ds = self.dataset.get_training_set()
         val_ds = self.dataset.get_validation_set()
@@ -183,7 +218,39 @@ class App(object):
 
         return stats
 
+    def test_model_confusion_matrix(self, model=ConvNet, uid=None, size=None):
+        """
+        Make confusion matrix from test dataset. This method should be
+        migrated to Visualizer.
+        :param model: The model to test
+        :param uid: Unique identifier in case of different model configurations
+        :param size: The size of the test set to test on
+        """
+        _model = model(self.io.model_directory, uid=uid)
+        _model.load()
+
+        test_ds = self.dataset.get_test_set()
+
+        if size:
+            test_ds = test_ds.take(size)
+
+        x, y = zip(*list(test_ds.as_numpy_iterator()))
+        x = np.array(x)
+
+        y_hat = _model.predict(x)
+
+        conf_matrix = confusion_matrix(np.array(y), list(map(lambda x: np.argmax(x), y_hat)))
+
+        labels = [g.name for g in Genre]
+
+        plt.figure(figsize=(10, 7))
+        sn.heatmap(conf_matrix, annot=True, fmt='g', xticklabels=labels, yticklabels=labels)
+        plt.show()
+
     def download_data(self):
+        """
+        Download the playlists specified in downloader
+        """
         logging.info("Downloading audio data from youtube playlists specified in downloader.py")
         download_playlists(self.io.songs_path)
 
@@ -200,6 +267,12 @@ class App(object):
             return
 
     def predict_genre_for_file(self, filepath, network=ConvNet):
+        """
+        Predict genre for single sound file.
+        :param filepath: Filepath to song file
+        :param network: Type of network that should perform the prediction
+        :return:
+        """
         processed = self.preprocess_file(filepath)
 
         model = network(self.io.model_directory)
@@ -213,9 +286,7 @@ class App(object):
         c = Counter(preds)
 
         first = c.most_common(1)[0]
-        # sec = c.most_common(2)[1]
-        print("Predicted class is: {0} with {1} / 20 classifications".format(Genre(first[0]), first[1]))
-        # print("Second predicted class: {0} with {1} / 20 classifications".format(Genre(sec[0]), sec[1]))
+        logging.info("Predicted class is: {0} with {1} / 20 classifications".format(Genre(first[0]), first[1]))
 
     def predict_genre_for_youtube_video(self, url):
         filepath = download_song(self.io.get_temp_filepath(), url)
@@ -223,6 +294,10 @@ class App(object):
         self.predict_genre_for_file(filepath)
 
     def test_models_performance(self):
+        """
+        Tests the performance of different models for
+        various song sample lengths
+        """
         uids = ["sec1", "sec1_5", "sec2", "sec2_5", None]
         models = [RecurrentNet, ConvocurrentNet, ConvNet, StandardNeuralNet]
 
@@ -249,24 +324,36 @@ class App(object):
         Visualizer(self.io.get_image_directory()).plot_models_performances(stats)
 
     def visualise_layers(self):
-        test_ds = self.dataset.get_test_set().take(1)
+        """
+        Visualises the convolution and pooling layers in the
+        convolutional neural network
+        :return:
+        """
+        test_ds = self.dataset.get_test_set().shuffle(100000).take(1)
 
-        model = ConvNet(self.io.model_directory)
+        model = ConvNet(self.io.model_directory, uid="minimal")
         model.load_or_error()
         model.predict_visualize_layers(test_ds)
 
+    def visualise_audio_sample(self, name):
+        """
+        Visualize a single audio file before processing
+        :param name: The name of the audio file, it should reside in
+            the temporary filepath
+        """
+        filename = os.path.join(self.io.get_temp_filepath(), name)
+
+        if self.io.ispath(filename):
+            rate, data = self.io.read(filename)
+        else:
+            filepath = self.io.build_filepath(filename, genre)
+            rate, data = self.io.read(filepath)
+
+        Visualizer(self.io.get_image_directory()).plot_audio_file(rate, data)
 
 
 if __name__ == "__main__":
     args = parse_args()
 
     app = App(args)
-
-    # app.download_data()
-    # app.train_model()
-    # app.perform_batch_preprocessing()
-    # app.test_models_performance()
-    # app.test_model()
-
-    app.visualise_layers()
 

@@ -4,6 +4,10 @@ import matplotlib.pyplot as plt
 
 
 class Visualizer(object):
+    """
+    This class is responsible for visualising the training
+    and testing performance measures.
+    """
 
     def __init__(self, figure_directory):
         self.figure_directory = figure_directory
@@ -49,9 +53,6 @@ class Visualizer(object):
             for j, accuracy in enumerate(acc):
                 accs[j, i] = accuracy[1]
 
-        # models = np.array(models)
-        # models = np.transpose(models)
-
         x = np.arange(len(accs[0]))
 
         fig, ax = plt.subplots()
@@ -72,6 +73,33 @@ class Visualizer(object):
 
         fig.tight_layout()
 
-        plt.savefig(self._get_filename("model_performances"), format='eps')
+        plt.savefig(self._get_filename("model_performances"))
 
+        plt.show()
+
+    def plot_convolution_performance(self, hists):
+        accs = list(map(lambda x: x.history["accuracy"][-1], hists))
+
+        x = np.arange(len(accs))
+
+        fig, ax = plt.subplots()
+
+        ax.set_title("Performance of different amounts of convolution kernels")
+        ax.set_ylabel("Accuracy")
+        ax.set_xticks(x)
+        ax.set_xticklabels(["64/128 Kernels", "32/64 Kernels", "16/32 Kernels", "8/16 Kernels", "4/8 Kernels"])
+        ax.bar(x, accs, color='#4d7902', width=0.8)
+
+        fig.tight_layout()
+
+        plt.savefig(self._get_filename("convolution_performance"), format='eps')
+        plt.show()
+
+    def plot_audio_file(self, rate, data):
+        x = np.arange(len(data)) / rate
+        plt.figure(figsize=(20, 5))
+        plt.title("Eye Of The Tiger")
+        plt.ylabel("Amplitudes")
+        plt.xlabel("Seconds")
+        plt.plot(x, data, linewidth=0.5)
         plt.show()

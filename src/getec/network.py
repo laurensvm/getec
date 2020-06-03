@@ -10,6 +10,13 @@ from .genre import Genre
 
 
 class Network(object):
+    """
+    An abstract base class which implements reshaping and other
+    internal helper methods such as selecting the optimizer
+    and setting up all the callback functions during training
+    and saving and loading the models.
+
+    """
     def __init__(self, model_directory, model=None, uid=None):
         self.model = model
         self.uid = uid
@@ -62,7 +69,7 @@ class Network(object):
         self.model = tf.keras.models.load_model(self.model_filepath)
 
     def train(self, train_ds, val_ds=None, epochs=1000):
-        callbacks = self._get_callbacks(es_patience=150)
+        callbacks = self._get_callbacks(es_patience=200)
 
         train_ds = train_ds.map(self._reshape).batch(128)
         val_ds = val_ds.map(self._reshape).batch(128)
@@ -84,6 +91,10 @@ class Network(object):
 
 
 class ConvNet(Network):
+    """
+    The implementation of the convolutional neural network.
+    This class inherits from the abstract base class Network
+    """
     def __init__(self, *args, **kwargs):
         super(ConvNet, self).__init__(*args, **kwargs)
 
@@ -92,19 +103,17 @@ class ConvNet(Network):
         res = tf.reshape(X, (shape[0], shape[1], 1))
         return res, y
 
-    def build(self, input_shape=(11, 29, 1), optimizer='adam'):
+    def build(self, input_shape=(11, 29, 1), optimizer='adam',
+              conv1_units=32, conv2_units=64, dense_units=128):
 
         optimizer = self._select_optimizer(optimizer)
 
         model = tf.keras.Sequential([
-            layers.Conv2D(32, (3, 3), padding="valid", activation='relu', input_shape=input_shape),
+            layers.Conv2D(conv1_units, (3, 3), padding="valid", activation='relu', input_shape=input_shape),
             layers.MaxPooling2D((2, 2)),
-            layers.Conv2D(64, (3, 3), activation='relu'),
+            layers.Conv2D(conv2_units, (3, 3), activation='relu'),
             layers.Flatten(),
-
-            # layers.Dense(256, activation='relu'),
-            # layers.Dropout(0.3),
-            layers.Dense(128, activation='relu'),
+            layers.Dense(dense_units, activation='relu'),
             layers.Dropout(0.3),
             layers.Dense(Genre.count(), activation='softmax')
         ])
@@ -141,6 +150,11 @@ class ConvNet(Network):
         return self.model.predict(X)
 
     def predict_visualize_layers(self, X):
+        """
+        Visualises the layers into matplotlib images
+        :param X: Spectrogram data
+        :return: Plot for various output layers.
+        """
 
         if isinstance(X, np.ndarray):
             X = np.reshape(X, (X.shape[0], X.shape[1], X.shape[2], 1))
@@ -153,6 +167,8 @@ class ConvNet(Network):
             plt.title("Test Sample Input")
             plt.grid(False)
             plt.imshow(x[0, :, :, 0], aspect='auto', cmap='plasma', origin='lower')
+            plt.colorbar()
+            plt.show()
 
             layer_outputs = [layer.output for layer in self.model.layers]
             visualisation_model = tf.keras.models.Model(inputs=self.model.input, outputs=layer_outputs)
@@ -181,13 +197,19 @@ class ConvNet(Network):
                 plt.title(layer_name)
                 plt.grid(False)
                 plt.imshow(grid, aspect='auto', cmap='plasma', origin='lower')
+                plt.colorbar()
+                plt.show()
 
             pred = np.argmax(visualisations[-1])
             print(f"Predicted class: {Genre(pred)} with probability {visualisations[-1][0][pred]}\n"
                 + f"Actual class: {Genre(y)}")
-            
+
 
 class RecurrentNet(Network):
+    """
+    The implementation of the recurrent neural network.
+    This class inherits from the abstract base class Network
+    """
     def __init__(self, *args, **kwargs):
         super(RecurrentNet, self).__init__(*args, **kwargs)
 
@@ -201,23 +223,9 @@ class RecurrentNet(Network):
             layers.SimpleRNN(256, input_shape=input_shape, return_sequences=True, activation='relu'),
             layers.SimpleRNN(128, activation='relu'),
             layers.Dense(256, activation='relu'),
-            # layers.SimpleRNN(256),
-            # layers.Dense(128, activation="relu"),
             layers.Dropout(0.2),
             layers.Dense(Genre.count(), activation='softmax')
         ])
-
-        # model = tf.keras.Sequential([
-        #     layers.SimpleRNN(256, input_shape=input_shape, return_sequences=True),
-        #     layers.Dropout(0.4),
-        #     layers.SimpleRNN(128, return_sequences=True),
-        #     layers.SimpleRNN(64),
-        #     layers.Dense(256, activation="relu"),
-        #     # layers.SimpleRNN(256),
-        #     # layers.Dense(128, activation="relu"),
-        #     layers.Dropout(0.2),
-        #     layers.Dense(Genre.count(), activation='softmax')
-        # ])
 
         model.build()
         model.summary()
@@ -241,6 +249,11 @@ class RecurrentNet(Network):
 
 
 class StandardNeuralNet(Network):
+    """
+    The implementation of the standard neural network.
+    This class inherits from the abstract base class Network
+    """
+
     def __init__(self, *args, **kwargs):
         super(StandardNeuralNet, self).__init__(*args, **kwargs)
 
@@ -256,7 +269,6 @@ class StandardNeuralNet(Network):
             layers.Dropout(0.3),
             layers.Dense(128, activation='relu'),
             layers.Dense(Genre.count(), activation='softmax')
-
         ])
 
         model.build()
@@ -270,6 +282,10 @@ class StandardNeuralNet(Network):
 
 
 class ConvocurrentNet(Network):
+    """
+    The implementation of the combined convolutional and recurrent neural network.
+    This class inherits from the abstract base class Network
+    """
     def __init__(self, *args, **kwargs):
         super(ConvocurrentNet, self).__init__(*args, **kwargs)
 
@@ -296,12 +312,14 @@ class ConvocurrentNet(Network):
 
         simple_rnn1 = layers.SimpleRNN(256, return_sequences=True)(_input)
         simple_rnn2 = layers.SimpleRNN(128)(simple_rnn1)
-        dense2 = layers.Dense(256, activation="relu")(simple_rnn2)
+        dense2 = layers.Dense(128, activation="relu")(simple_rnn2)
 
         # Concatenate the two subnetworks
         concat = layers.Concatenate()([dense1, dense2])
-        dropout1 = layers.Dropout(0.3)(concat)
-        output = layers.Dense(Genre.count(), activation='softmax')(dropout1)
+        dense3 = layers.Dense(128, activation="relu")(concat)
+        dropout1 = layers.Dropout(0.3)(dense3)
+        dense4 = layers.Dense(128, activation="relu")(dropout1)
+        output = layers.Dense(Genre.count(), activation='softmax')(dense4)
 
         model = tf.keras.Model(inputs=[_input], outputs=[output])
 

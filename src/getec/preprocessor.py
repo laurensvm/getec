@@ -81,12 +81,6 @@ class PreProcessor(object):
                     window_ms=20.0, eps=1e-14):
         """
         Replaced by scipy.spectrogram
-        :param samples:
-        :param sample_rate:
-        :param stride_ms:
-        :param window_ms:
-        :param eps:
-        :return:
         """
         samples = samples.astype(np.int16)
 
@@ -115,7 +109,7 @@ class PreProcessor(object):
         fft[(0, -1), :] /= scale
 
         # Prepare fft frequency list
-        freqs = float(sample_rate) / window_size * np.arange(fft.shape[0])
+        # freqs = float(sample_rate) / window_size * np.arange(fft.shape[0])
 
         # Compute spectrogram feature
         # ind = np.where(freqs <= max_freq)[0][-1] + 1

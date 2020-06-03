@@ -9,6 +9,12 @@ from .genre import Genre
 
 
 def download_playlists(songs_path, options=None):
+    """
+    Downloads all the playlists from youtube
+    :param songs_path: The root directory for where the songs should be stored
+    :param options: An optional object to configure downloading options
+    :return: Saved files to the filesystem
+    """
 
     if not options:
         options = {
@@ -45,9 +51,6 @@ def download_playlists(songs_path, options=None):
     playlist_genres["JAZZ"].append("https://www.youtube.com/playlist?list=PL8F6B0753B2CCA128")
 
     for genre, playlists in playlist_genres.items():
-        #TEMP
-        if genre != "BALLAD":
-            continue
 
         logging.info("Downloading playlists from genre {0}".format(genre))
         options['outtmpl'] = path.join(songs_path, genre.lower(), '%(title)s.%(ext)s')
@@ -62,6 +65,13 @@ def download_playlists(songs_path, options=None):
 
 
 def download_song(_path, url, options=None):
+    """
+    Download single song
+    :param _path: filepath to store the single song
+    :param url: YouTube/SoundCloud URL to retrieve the data from
+    :param options: An optional object to configure downloading options
+    :return: Saves the audio file to the filesystem
+    """
     t = time.localtime()
     outtmpl = time.strftime("%H-%M-%S", t)
 
